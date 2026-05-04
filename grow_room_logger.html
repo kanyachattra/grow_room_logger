@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>🌿 Grow Room Logger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --green: #1a9e6e;
+  --green-dark: #0f6e4c;
+  --green-light: #e8f7f1;
+  --green-mid: #c2ead8;
+  --accent: #f0a500;
+  --red: #d94f4f;
+  --blue: #2d7dd2;
+  --bg: #f5f7f5;
+  --card: #ffffff;
+  --text: #1a2a1f;
+  --sub: #6b8a76;
+  --border: #d4e6da;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'Sarabun', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body { font-family: var(--sans); background: var(--bg); color: var(--text); font-size: 15px; }
+
+/* ── SETUP SCREEN ─────────────────────────── */
+#setup-screen {
+  position: fixed; inset: 0; background: var(--green-dark);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 2rem; z-index: 1000; transition: opacity .4s;
+}
+#setup-screen.hidden { opacity: 0; pointer-events: none; }
+.setup-logo { font-size: 56px; margin-bottom: 12px; }
+.setup-title { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+.setup-sub { font-size: 13px; color: rgba(255,255,255,.6); margin-bottom: 32px; }
+.setup-card { background: rgba(255,255,255,.1); border-radius: 16px; padding: 20px; width: 100%; max-width: 360px; }
+.setup-field { margin-bottom: 16px; }
+.setup-field label { display: block; font-size: 12px; color: rgba(255,255,255,.7); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .06em; }
+.setup-field input { width: 100%; padding: 11px 14px; border: 1.5px solid rgba(255,255,255,.2); border-radius: 10px; background: rgba(255,255,255,.1); color: #fff; font-family: var(--sans); font-size: 14px; }
+.setup-field input::placeholder { color: rgba(255,255,255,.35); }
+.setup-field input:focus { outline: none; border-color: rgba(255,255,255,.6); }
+.setup-btn { width: 100%; padding: 14px; background: #fff; color: var(--green-dark); border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.setup-skip { display: block; text-align: center; color: rgba(255,255,255,.5); font-size: 12px; margin-top: 12px; cursor: pointer; }
+
+/* ── MAIN APP ─────────────────────────────── */
+#app { height: 100%; display: flex; flex-direction: column; }
+.topbar {
+  background: var(--green-dark); color: #fff; padding: 10px 16px 8px;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-shrink: 0;
+}
+.topbar-left .app-name { font-size: 15px; font-weight: 600; }
+.topbar-left .app-room { font-size: 11px; color: rgba(255,255,255,.65); margin-top: 1px; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.conn-indicator { display: flex; align-items: center; gap: 5px; font-size: 11px; color: rgba(255,255,255,.7); }
+.conn-dot { width: 7px; height: 7px; border-radius: 50%; background: #aaa; }
+.conn-dot.online { background: #5de09e; }
+.conn-dot.offline { background: #f08080; }
+.date-chip { font-size: 11px; color: rgba(255,255,255,.7); font-family: var(--mono); }
+
+.nav-tabs {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  background: var(--green-dark); border-top: 1px solid rgba(255,255,255,.12);
+  flex-shrink: 0;
+}
+.nav-tab { padding: 8px 4px 6px; border: none; background: transparent; color: rgba(255,255,255,.5); cursor: pointer; font-size: 9.5px; font-family: var(--sans); display: flex; flex-direction: column; align-items: center; gap: 3px; transition: color .2s; }
+.nav-tab.active { color: #fff; }
+.nav-tab .ni { font-size: 19px; }
+
+.content { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+.tab { display: none; padding: 12px 14px 80px; }
+.tab.active { display: block; }
+
+/* ── CARDS ─────────────────────────────────── */
+.card { background: var(--card); border-radius: 14px; padding: 13px 15px; margin-bottom: 11px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.card-label { font-size: 10.5px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 11px; display: flex; align-items: center; gap: 6px; }
+.card-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── FORM ELEMENTS ──────────────────────────── */
+.field { margin-bottom: 11px; }
+.field label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
+.field input, .field select, .field textarea {
+  width: 100%; padding: 10px 13px; border: 1.5px solid var(--border); border-radius: 10px;
+  background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px;
+  -webkit-appearance: none; transition: border-color .2s;
+}
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--green); background: #fff; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; }
+
+/* ── BUTTONS ────────────────────────────────── */
+.btn { width: 100%; padding: 13px; border: none; border-radius: 12px; font-family: var(--sans); font-size: 15px; font-weight: 600; cursor: pointer; transition: all .15s; }
+.btn-green { background: var(--green); color: #fff; }
+.btn-green:active { background: var(--green-dark); transform: scale(.98); }
+.btn-green:disabled { background: var(--green-mid); cursor: not-allowed; }
+.btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--sub); margin-top: 8px; }
+.btn-line { background: #06C755; color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; }
+.btn-line:active { background: #04a848; transform: scale(.98); }
+.btn-danger { background: transparent; border: 1.5px solid var(--red); color: var(--red); }
+.btn-sm { padding: 8px 14px; width: auto; font-size: 13px; border-radius: 9px; }
+.add-row-btn { width: 100%; padding: 10px; border: 1.5px dashed var(--border); border-radius: 10px; background: transparent; color: var(--sub); cursor: pointer; font-size: 13px; font-family: var(--sans); margin-top: 4px; }
+
+/* ── ALERTS ─────────────────────────────────── */
+.alert { padding: 10px 13px; border-radius: 10px; font-size: 13px; margin-bottom: 10px; display: none; }
+.al-ok { background: var(--green-light); color: var(--green-dark); border: 1.5px solid var(--green-mid); }
+.al-err { background: #fdecea; color: #a32d2d; border: 1.5px solid #f7c1c1; }
+.al-info { background: #e8f1fc; color: #1a5ba8; border: 1.5px solid #b5d0f5; }
+
+/* ── METRICS ─────────────────────────────────── */
+.metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 11px; }
+.metric { background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.metric-label { font-size: 11px; color: var(--sub); margin-bottom: 3px; }
+.metric-value { font-size: 24px; font-weight: 600; font-family: var(--mono); color: var(--text); }
+.metric-value.small { font-size: 16px; }
+.metric-value.green { color: var(--green); }
+
+/* ── VPD ZONES ──────────────────────────────── */
+.vpd-result { border-radius: 10px; padding: 11px 14px; font-size: 13px; font-weight: 600; text-align: center; margin-top: 8px; display: none; }
+.vpd-b { background: #ddeeff; color: #1a4f8a; }
+.vpd-g { background: var(--green-light); color: var(--green-dark); }
+.vpd-y { background: #fff3dc; color: #7a4a00; }
+.vpd-r { background: #fdecea; color: #a32d2d; }
+
+/* ── HISTORY ITEMS ──────────────────────────── */
+.hist-item { padding: 11px 0; border-bottom: 1px solid var(--border); }
+.hist-item:last-child { border-bottom: none; }
+.hist-top { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 5px; }
+.hist-date { font-size: 13px; font-weight: 600; font-family: var(--mono); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+.b-green { background: var(--green-light); color: var(--green-dark); }
+.b-blue { background: #e8f1fc; color: #1a5ba8; }
+.b-yellow { background: #fff3dc; color: #7a4a00; }
+.b-gray { background: var(--bg); color: var(--sub); border: 1px solid var(--border); }
+.hist-detail { font-size: 12.5px; color: var(--sub); line-height: 1.7; }
+.hist-detail strong { color: var(--text); }
+
+/* ── PLANT TABLE ────────────────────────────── */
+.plant-grid { display: grid; grid-template-columns: 26px 1fr 85px; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.plant-grid:last-child { border-bottom: none; }
+.plant-no { font-size: 11px; color: var(--sub); font-weight: 600; text-align: center; font-family: var(--mono); }
+.plant-grid input { padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 13px; width: 100%; font-family: var(--sans); }
+.plant-grid input:focus { outline: none; border-color: var(--green); background: #fff; }
+
+/* ── IRR BLOCK ──────────────────────────────── */
+.irr-block { background: var(--bg); border-radius: 10px; padding: 11px 12px; margin-bottom: 8px; border: 1.5px solid var(--border); }
+.irr-label { font-size: 11px; color: var(--sub); font-weight: 600; margin-bottom: 8px; }
+
+/* ── RADIO ───────────────────────────────────── */
+.radio-group { display: flex; gap: 14px; margin-top: 4px; }
+.radio-group label { display: flex; align-items: center; gap: 5px; font-size: 14px; cursor: pointer; }
+
+/* ── FILTER TABS ─────────────────────────────── */
+.filter-wrap { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.filter-btn { padding: 6px 12px; border: 1.5px solid var(--border); border-radius: 20px; background: var(--card); color: var(--sub); cursor: pointer; font-size: 12px; font-family: var(--sans); }
+.filter-btn.active { background: var(--green); color: #fff; border-color: var(--green); }
+
+/* ── SYNC TABLE ──────────────────────────────── */
+.sync-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.sync-row:last-child { border-bottom: none; }
+.sync-val { font-size: 12px; color: var(--sub); }
+
+/* ── SETUP GUIDE ─────────────────────────────── */
+.guide-step { display: flex; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.guide-step:last-child { border-bottom: none; }
+.step-num { width: 26px; height: 26px; border-radius: 50%; background: var(--green); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.step-title { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+.step-desc { font-size: 12px; color: var(--sub); line-height: 1.55; }
+.code-snippet { background: #1a2a1f; color: #5de09e; border-radius: 8px; padding: 8px 11px; font-family: var(--mono); font-size: 11px; margin-top: 6px; word-break: break-all; line-height: 1.6; }
+
+/* ── PROGRESS ────────────────────────────────── */
+.prog-wrap { height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; margin: 8px 0; }
+.prog-bar { height: 100%; background: var(--green); border-radius: 3px; transition: width .3s; }
+.prog-msg { font-size: 12px; color: var(--sub); }
+
+.empty { text-align: center; color: var(--sub); padding: 24px 16px; font-size: 13px; }
+.section-title { font-size: 16px; font-weight: 600; margin-bottom: 13px; }
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-logo">🌿</div>
+  <div class="setup-title">Grow Room Logger</div>
+  <div class="setup-sub">CANNDO PHARMA — Cultivation Dept.</div>
+  <div class="setup-card">
+    <div class="setup-field">
+      <label>ชื่อ-นามสกุล (ผู้บันทึก)</label>
+      <input type="text" id="su-user" placeholder="เช่น สมชาย ใจดี">
+    </div>
+    <div class="setup-field">
+      <label>ห้องเริ่มต้น</label>
+      <input type="text" id="su-room" placeholder="เช่น R-01">
+    </div>
+    <div class="setup-field">
+      <label>Google Apps Script URL</label>
+      <input type="url" id="su-url" placeholder="https://script.google.com/...">
+    </div>
+    <div class="setup-field">
+      <label>LINE Notify Token</label>
+      <input type="text" id="su-line" placeholder="วาง Token LINE Notify">
+    </div>
+    <button class="setup-btn" onclick="finishSetup()">เริ่มใช้งาน →</button>
+    <span class="setup-skip" onclick="finishSetup()">ข้าม ตั้งค่าภายหลัง</span>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="app-name">🌿 Grow Room Logger</div>
+      <div class="app-room" id="tb-room">CANNDO PHARMA</div>
+    </div>
+    <div class="topbar-right">
+      <div class="conn-indicator"><div class="conn-dot" id="conn-dot"></div><span id="conn-txt">—</span></div>
+      <div class="date-chip" id="tb-date"></div>
+    </div>
+  </div>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showTab('rec',this)"><span class="ni">📝</span>บันทึก</button>
+    <button class="nav-tab" onclick="showTab('sync',this)"><span class="ni">🔄</span>Sync</button>
+    <button class="nav-tab" onclick="showTab('report',this)"><span class="ni">📊</span>รายงาน</button>
+    <button class="nav-tab" onclick="showTab('line',this)"><span class="ni">💬</span>LINE</button>
+    <button class="nav-tab" onclick="showTab('settings',this)"><span class="ni">⚙️</span>ตั้งค่า</button>
+  </div>
+
+  <div class="content">
+
+    <!-- TAB: บันทึก -->
+    <div id="tab-rec" class="tab active">
+      <div id="al-rec" class="alert"></div>
+      <div class="card">
+        <div class="card-label">ข้อมูลทั่วไป</div>
+        <div class="row2">
+          <div class="field"><label>วันที่</label><input type="date" id="r-date"></div>
+          <div class="field"><label>Room No.</label><input type="text" id="r-room" placeholder="R-01"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Stage</label>
+            <select id="r-stage"><option>Nursery</option><option>Vegetative</option><option>Flowering</option><option>Mother Plant</option></select>
+          </div>
+          <div class="field"><label>Week / Day</label><input type="text" id="r-week" placeholder="W3 D4"></div>
+        </div>
+        <div class="field"><label>ประเภทบันทึก</label>
+          <select id="r-type" onchange="switchForm()">
+            <option value="env">🌡️ สภาวะแวดล้อม (FM-CV-035)</option>
+            <option value="plant">🌱 ความสูงต้นไม้ (FM-CV-006)</option>
+            <option value="water">💧 การให้น้ำ (FM-CV-011)</option>
+            <option value="check">✅ ตรวจสอบประจำวัน (FM-CV-038)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- FORM: ENV -->
+      <div id="form-env">
+        <div class="card">
+          <div class="card-label">สภาวะแวดล้อม 5 จุดวัด</div>
+          <div id="env-body"></div>
+          <div class="vpd-result" id="vpd-avg"></div>
+        </div>
+      </div>
+
+      <!-- FORM: PLANT -->
+      <div id="form-plant" style="display:none">
+        <div class="card">
+          <div class="card-label">ต้นที่ 1–20</div>
+          <div id="plant-a"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">ต้นที่ 21–40</div>
+          <div id="plant-b"></div>
+        </div>
+      </div>
+
+      <!-- FORM: WATER -->
+      <div id="form-water" style="display:none">
+        <div class="card">
+          <div class="card-label">รอบการให้น้ำ</div>
+          <div id="irr-list"></div>
+          <button class="add-row-btn" onclick="addIrr()">+ เพิ่มรอบการให้น้ำ</button>
+        </div>
+        <div class="card">
+          <div class="card-label">Run-off & ความชื้น (ต้นที่ 1–10)</div>
+          <div id="ro-list"></div>
+        </div>
+      </div>
+
+      <!-- FORM: CHECK -->
+      <div id="form-check" style="display:none">
+        <div class="card">
+          <div class="card-label">ผลการตรวจสอบประจำวัน</div>
+          <div class="field"><label>เวลา</label><input type="time" id="c-time"></div>
+          <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:12px;color:var(--sub);margin-bottom:5px">สภาพพืช (Deficiencies)</div>
+            <div class="radio-group"><label><input type="radio" name="defic" value="ไม่พบ" checked> ไม่พบ</label><label><input type="radio" name="defic" value="พบ"> พบ</label></div>
+          </div>
+          <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:12px;color:var(--sub);margin-bottom:5px">แมลง (Insect)</div>
+            <div class="radio-group"><label><input type="radio" name="insect" value="ไม่พบ" checked> ไม่พบ</label><label><input type="radio" name="insect" value="พบ"> พบ</label></div>
+          </div>
+          <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:12px;color:var(--sub);margin-bottom:5px">อุปกรณ์</div>
+            <div class="radio-group"><label><input type="radio" name="equip" value="ปกติ" checked> ปกติ</label><label><input type="radio" name="equip" value="ผิดปกติ"> ผิดปกติ</label></div>
+          </div>
+          <div style="padding:8px 0">
+            <div style="font-size:12px;color:var(--sub);margin-bottom:5px">ความสะอาด</div>
+            <div class="radio-group"><label><input type="radio" name="clean" value="สะอาด" checked> สะอาด</label><label><input type="radio" name="clean" value="ไม่สะอาด"> ไม่สะอาด</label></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">VPD Quick Check</div>
+          <div class="row2">
+            <div class="field"><label>Leaf Temp °C</label><input type="number" id="qlt" placeholder="25" oninput="qvpd()"></div>
+            <div class="field"><label>%RH</label><input type="number" id="qrh" placeholder="65" oninput="qvpd()"></div>
+          </div>
+          <div class="vpd-result" id="qvpd-out"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">หมายเหตุ</div>
+          <div class="field"><textarea id="c-note" rows="3" placeholder="บันทึกเพิ่มเติม..." style="resize:none"></textarea></div>
+        </div>
+      </div>
+
+      <button class="btn btn-green" id="main-save-btn" onclick="saveRecord()">💾 บันทึก &amp; ส่งไป Google Sheets</button>
+      <button class="btn btn-outline" onclick="saveLocal()">📱 บันทึกไว้ก่อน (Offline)</button>
+    </div>
+
+    <!-- TAB: SYNC -->
+    <div id="tab-sync" class="tab">
+      <div class="card">
+        <div class="card-label">สถานะระบบ</div>
+        <div class="sync-row"><span>Google Sheets</span><span class="sync-val" id="sy-sheets">—</span></div>
+        <div class="sync-row"><span>AppSheet</span><span class="sync-val">อ่านจาก Sheets อัตโนมัติ</span></div>
+        <div class="sync-row"><span>LINE Notify</span><span class="sync-val" id="sy-line">—</span></div>
+        <div class="sync-row"><span>รอส่ง (Queue)</span><span class="sync-val" id="sy-queue" style="font-weight:600;color:var(--accent)">0 รายการ</span></div>
+      </div>
+      <div class="card">
+        <div class="card-label">ดึงข้อมูลจาก Sheets</div>
+        <div class="row2">
+          <div class="field"><label>วันที่</label><input type="date" id="pull-date"></div>
+          <div class="field"><label>Room</label><input type="text" id="pull-room" placeholder="ทุกห้อง"></div>
+        </div>
+        <button class="btn btn-green" onclick="pullData()">⬇ ดึงข้อมูล</button>
+        <div id="pull-prog" style="display:none;margin-top:10px">
+          <div class="prog-wrap"><div class="prog-bar" id="pull-bar" style="width:0%"></div></div>
+          <div class="prog-msg" id="pull-msg"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-label">Queue รอส่ง</div>
+        <div id="queue-list"><div class="empty">ไม่มีข้อมูลค้างส่ง ✓</div></div>
+        <button class="btn btn-outline" id="flush-btn" style="display:none" onclick="flushQueue()">📤 ส่งข้อมูลค้างทั้งหมด</button>
+      </div>
+    </div>
+
+    <!-- TAB: REPORT -->
+    <div id="tab-report" class="tab">
+      <div class="metric-grid" id="rpt-metrics">
+        <div class="metric"><div class="metric-label">ทั้งหมด</div><div class="metric-value">0</div></div>
+        <div class="metric"><div class="metric-label">วันนี้</div><div class="metric-value green">0</div></div>
+        <div class="metric"><div class="metric-label">Avg VPD</div><div class="metric-value small">—</div></div>
+        <div class="metric"><div class="metric-label">Avg Height</div><div class="metric-value small">—</div></div>
+      </div>
+      <div class="filter-wrap">
+        <button class="filter-btn active" onclick="setFilter('all',this)">ทั้งหมด</button>
+        <button class="filter-btn" onclick="setFilter('env',this)">🌡️ สภาวะ</button>
+        <button class="filter-btn" onclick="setFilter('plant',this)">🌱 ความสูง</button>
+        <button class="filter-btn" onclick="setFilter('water',this)">💧 น้ำ</button>
+        <button class="filter-btn" onclick="setFilter('check',this)">✅ ตรวจ</button>
+      </div>
+      <div id="rpt-list"><div class="empty">ยังไม่มีข้อมูล กรุณาบันทึกก่อน</div></div>
+    </div>
+
+    <!-- TAB: LINE -->
+    <div id="tab-line" class="tab">
+      <div id="al-line" class="alert"></div>
+      <div class="card">
+        <div class="card-label">LINE Notify Token</div>
+        <div class="field"><input type="text" id="line-token" placeholder="วาง Token ที่นี่" oninput="saveCfg()"></div>
+        <button class="btn btn-outline btn-sm" onclick="testLine()">ทดสอบส่ง LINE</button>
+      </div>
+      <div class="card">
+        <div class="card-label">เลือกข้อมูลที่จะส่ง</div>
+        <label style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px"><input type="checkbox" id="ls-env" checked> 🌡️ สภาวะแวดล้อม</label>
+        <label style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px"><input type="checkbox" id="ls-plant" checked> 🌱 ความสูงต้นไม้</label>
+        <label style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px"><input type="checkbox" id="ls-water" checked> 💧 การให้น้ำ</label>
+        <label style="display:flex;align-items:center;gap:9px;padding:8px 0;font-size:14px"><input type="checkbox" id="ls-check" checked> ✅ ตรวจสอบ</label>
+      </div>
+      <button class="btn btn-line" onclick="sendLine()"><span style="font-size:20px">LINE</span> ส่งรายงานวันนี้ (จากเครื่อง)</button>
+      <button class="btn btn-line" style="background:#04a040" onclick="sendLineSummary()"><span style="font-size:20px">LINE</span> ส่งสรุปจาก Google Sheets</button>
+    </div>
+
+    <!-- TAB: SETTINGS -->
+    <div id="tab-settings" class="tab">
+      <div class="section-title">ตั้งค่า</div>
+      <div class="card">
+        <div class="card-label">ผู้บันทึก & ห้อง</div>
+        <div class="field"><label>ชื่อผู้บันทึก</label><input type="text" id="cfg-user" placeholder="ชื่อ-นามสกุล" oninput="saveCfg()"></div>
+        <div class="field"><label>ห้องเริ่มต้น</label><input type="text" id="cfg-room" placeholder="R-01" oninput="saveCfg()"></div>
+      </div>
+      <div class="card">
+        <div class="card-label">Google Apps Script</div>
+        <div class="field"><label>Web App URL</label><input type="url" id="cfg-url" placeholder="https://script.google.com/macros/s/.../exec" oninput="saveCfg()"></div>
+        <button class="btn btn-outline btn-sm" onclick="testConn()">ทดสอบการเชื่อมต่อ</button>
+        <div id="al-conn" class="alert" style="margin-top:8px"></div>
+      </div>
+      <div class="card">
+        <div class="card-label">วิธีติดตั้ง (คลิกเพื่อขยาย)</div>
+        <div id="guide-body">
+          <div class="guide-step">
+            <div class="step-num">1</div>
+            <div><div class="step-title">สร้าง Google Sheets ใหม่</div><div class="step-desc">sheets.google.com → ไฟล์ใหม่ → ตั้งชื่อ "Grow Room Logger"</div></div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">2</div>
+            <div><div class="step-title">เปิด Apps Script</div><div class="step-desc">ส่วนขยาย → Apps Script → ลบ code เดิมทั้งหมด → วาง code จากไฟล์ GrowRoom_AppScript.js</div></div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">3</div>
+            <div><div class="step-title">รัน initSheets()</div><div class="step-desc">กดปุ่ม ▶ Run เลือก initSheets → อนุญาต Permission → Sheet จะถูกสร้างอัตโนมัติ</div></div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">4</div>
+            <div><div class="step-title">Deploy เป็น Web App</div><div class="step-desc">Deploy → New Deployment → Web App<br>Execute as: <strong>Me</strong><br>Access: <strong>Anyone</strong><br>→ คัดลอก URL</div></div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">5</div>
+            <div><div class="step-title">วาง URL ด้านบน</div><div class="step-desc">แล้วกด "ทดสอบการเชื่อมต่อ" ✓</div></div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">6</div>
+            <div><div class="step-title">เชื่อม AppSheet</div><div class="step-desc">appsheet.com → New App → Google Sheets → เลือก Spreadsheet เดียวกัน → AppSheet สร้าง View ให้อัตโนมัติ</div></div>
+          </div>
+          <div class="guide-step">
+            <div class="step-num">7</div>
+            <div><div class="step-title">LINE Notify</div><div class="step-desc">notify.line.me → Login → Generate token → เลือกกลุ่ม → วาง Token ในแท็บ 💬 LINE</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-label">ข้อมูล</div>
+        <button class="btn btn-danger" onclick="clearAll()">🗑 ล้างข้อมูลทั้งหมดในเครื่อง</button>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<script>
+// ────────────────────────────────────────
+//  STATE
+// ────────────────────────────────────────
+let cfg = { url:'', user:'', room:'R-01', lineToken:'' };
+let db  = { env:[], plant:[], water:[], check:[] };
+let queue = [];
+let irrN = 0;
+let activeFilter = 'all';
+
+// ────────────────────────────────────────
+//  INIT
+// ────────────────────────────────────────
+function init() {
+  loadCfg();
+  const d = today();
+  set('r-date', d); set('pull-date', d); set('c-time', nowTime());
+  document.getElementById('tb-date').textContent = new Date().toLocaleDateString('th-TH',{month:'short',day:'numeric'});
+  buildEnvForm(); buildPlantForm(); buildROForm(); addIrr();
+  switchForm(); updateSyncUI(); updateReport();
+  if (cfg.url) setConn('online','เชื่อมต่อแล้ว');
+  else setConn('','ยังไม่ตั้งค่า');
+  // Show setup if no user
+  if (!cfg.user) {
+    document.getElementById('setup-screen').style.display='flex';
+  } else {
+    document.getElementById('setup-screen').style.display='none';
+    document.getElementById('app').style.display='flex';
+  }
+}
+
+function finishSetup() {
+  cfg.user = document.getElementById('su-user').value.trim();
+  cfg.room = document.getElementById('su-room').value.trim() || 'R-01';
+  cfg.url  = document.getElementById('su-url').value.trim();
+  cfg.lineToken = document.getElementById('su-line').value.trim();
+  if (!cfg.user) cfg.user = 'ผู้ใช้';
+  saveCfg();
+  document.getElementById('setup-screen').classList.add('hidden');
+  setTimeout(()=>{
+    document.getElementById('setup-screen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    updateSyncUI();
+  }, 400);
+}
+
+// ────────────────────────────────────────
+//  HELPERS
+// ────────────────────────────────────────
+const today = () => new Date().toISOString().split('T')[0];
+const nowTime = () => new Date().toTimeString().slice(0,5);
+const set = (id, val) => { const el=document.getElementById(id); if(el) el.value=val; };
+const get = id => document.getElementById(id)?.value || '';
+const cvpd = (lt,rh) => 0.6108 * Math.exp(17.27*lt/(lt+237.3)) * (1 - rh/100);
+function vpdZone(v) {
+  if(v<0.4) return {c:'vpd-b', l:'Low — Propagation / Early Veg'};
+  if(v<0.8) return {c:'vpd-g', l:'Healthy — Late Veg / Early Flower'};
+  if(v<1.2) return {c:'vpd-y', l:'High — Late Flower'};
+  return {c:'vpd-r', l:'⚠ Danger Zone'};
+}
+function showAl(id, type, msg) {
+  const el = document.getElementById(id);
+  el.className = 'alert ' + type;
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(()=>el.style.display='none', 3500);
+}
+function setConn(state, txt) {
+  const dot = document.getElementById('conn-dot');
+  dot.className = 'conn-dot' + (state?' '+state:'');
+  document.getElementById('conn-txt').textContent = txt;
+}
+
+// ────────────────────────────────────────
+//  NAVIGATION
+// ────────────────────────────────────────
+function showTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='report') updateReport();
+  if(name==='sync') updateSyncUI();
+}
+
+function switchForm() {
+  const t = get('r-type');
+  ['env','plant','water','check'].forEach(f => {
+    document.getElementById('form-'+f).style.display = f===t ? 'block' : 'none';
+  });
+}
+
+// ────────────────────────────────────────
+//  BUILD FORMS
+// ────────────────────────────────────────
+function buildEnvForm() {
+  const c = document.getElementById('env-body'); c.innerHTML='';
+  for(let i=1;i<=5;i++) {
+    c.innerHTML+=`<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--sub);font-weight:600;margin-bottom:6px;font-family:var(--mono)">จุดที่ ${i}</div>
+      <div class="row3">
+        <div class="field"><label>Leaf T°C</label><input type="number" step="0.1" placeholder="25" id="ea-lt-${i}" oninput="updVPD()"></div>
+        <div class="field"><label>%RH</label><input type="number" placeholder="65" id="ea-rh-${i}" oninput="updVPD()"></div>
+        <div class="field"><label>VPD</label><input id="ea-vpd-${i}" readonly style="background:var(--bg);border-color:var(--border)"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>PPFD</label><input type="number" placeholder="600" id="ea-ppfd-${i}"></div>
+        <div class="field"><label>Room T°C</label><input type="number" step="0.1" placeholder="26" id="ea-rt-${i}"></div>
+      </div>
+    </div>`;
+  }
+}
+
+function updVPD() {
+  let vs=[];
+  for(let i=1;i<=5;i++) {
+    const lt=parseFloat(document.getElementById('ea-lt-'+i).value);
+    const rh=parseFloat(document.getElementById('ea-rh-'+i).value);
+    const vf=document.getElementById('ea-vpd-'+i);
+    if(!isNaN(lt)&&!isNaN(rh)){const v=cvpd(lt,rh);vf.value=v.toFixed(2);vs.push(v);}
+    else vf.value='';
+  }
+  const box=document.getElementById('vpd-avg');
+  if(vs.length){
+    const avg=vs.reduce((a,b)=>a+b,0)/vs.length;
+    const z=vpdZone(avg);
+    box.className='vpd-result '+z.c;
+    box.textContent=`เฉลี่ย VPD: ${avg.toFixed(2)} kPa — ${z.l}`;
+    box.style.display='block';
+  } else box.style.display='none';
+}
+
+function buildPlantForm() {
+  ['a','b'].forEach((h,hi)=>{
+    const c=document.getElementById('plant-'+h); c.innerHTML='';
+    for(let i=1;i<=20;i++){
+      const n=hi*20+i;
+      c.innerHTML+=`<div class="plant-grid"><div class="plant-no">${n}</div>
+        <input type="text" placeholder="รหัส" id="pt-c-${n}">
+        <input type="number" step="0.5" placeholder="cm" id="pt-h-${n}">
+      </div>`;
+    }
+  });
+}
+
+function buildROForm() {
+  const c=document.getElementById('ro-list'); c.innerHTML='';
+  for(let i=1;i<=10;i++) {
+    c.innerHTML+=`<div style="padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--sub);font-weight:600;margin-bottom:5px;font-family:var(--mono)">ต้นที่ ${i}</div>
+      <div class="row3">
+        <div class="field"><label>EC</label><input type="number" step="0.01" placeholder="mS" id="ro-ec-${i}"></div>
+        <div class="field"><label>pH</label><input type="number" step="0.1" placeholder="6.0" id="ro-ph-${i}"></div>
+        <div class="field"><label>Moist%</label><input type="number" step="0.1" placeholder="%" id="ro-m-${i}"></div>
+      </div>
+    </div>`;
+  }
+}
+
+function addIrr() {
+  irrN++;
+  const c=document.getElementById('irr-list');
+  const d=document.createElement('div'); d.className='irr-block';
+  d.innerHTML=`<div class="irr-label">รอบที่ ${irrN}</div>
+    <div class="row2">
+      <div class="field"><label>เวลา</label><input type="time" id="ir-t-${irrN}" value="${nowTime()}"></div>
+      <div class="field"><label>Volume (mL)</label><input type="number" id="ir-v-${irrN}" placeholder="500"></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>EC (mS/cm)</label><input type="number" step="0.01" id="ir-ec-${irrN}"></div>
+      <div class="field"><label>pH</label><input type="number" step="0.1" id="ir-ph-${irrN}"></div>
+      <div class="field"><label>นาที</label><input type="number" id="ir-mn-${irrN}"></div>
+    </div>`;
+  c.appendChild(d);
+}
+
+function qvpd() {
+  const lt=parseFloat(get('qlt')), rh=parseFloat(get('qrh'));
+  const box=document.getElementById('qvpd-out');
+  if(isNaN(lt)||isNaN(rh)){box.style.display='none';return}
+  const v=cvpd(lt,rh); const z=vpdZone(v);
+  box.className='vpd-result '+z.c;
+  box.textContent=`VPD = ${v.toFixed(2)} kPa — ${z.l}`;
+  box.style.display='block';
+}
+
+// ────────────────────────────────────────
+//  COLLECT & SAVE
+// ────────────────────────────────────────
+function collectRecord() {
+  const type=get('r-type');
+  const base={type,date:get('r-date'),room:get('r-room')||cfg.room,
+    stage:get('r-stage'),weekday:get('r-week'),recorder:cfg.user};
+  if(type==='env'){
+    const areas=[];
+    for(let i=1;i<=5;i++){
+      const lt=document.getElementById('ea-lt-'+i).value;
+      const rh=document.getElementById('ea-rh-'+i).value;
+      if(lt||rh) areas.push({area:i,leafTemp:lt,rh,
+        vpd:lt&&rh?cvpd(parseFloat(lt),parseFloat(rh)).toFixed(2):'',
+        ppfd:document.getElementById('ea-ppfd-'+i).value,
+        roomTemp:document.getElementById('ea-rt-'+i).value});
+    }
+    return {...base,areas};
+  }
+  if(type==='plant'){
+    const plants=[];
+    for(let i=1;i<=40;i++){
+      const h=document.getElementById('pt-h-'+i).value;
+      const c=document.getElementById('pt-c-'+i).value;
+      if(h||c) plants.push({no:i,code:c,height:h});
+    }
+    return {...base,plants,week:get('r-week').split('W')[1]?.split('D')[0]||'',day:get('r-week').split('D')[1]||''};
+  }
+  if(type==='water'){
+    const irrs=[];
+    for(let i=1;i<=irrN;i++){
+      const v=document.getElementById('ir-v-'+i)?.value;
+      if(v) irrs.push({no:i,time:document.getElementById('ir-t-'+i).value,volume:v,
+        ec:document.getElementById('ir-ec-'+i).value,ph:document.getElementById('ir-ph-'+i).value,
+        duration:document.getElementById('ir-mn-'+i).value});
+    }
+    const ros=[];
+    for(let i=1;i<=10;i++){
+      const ec=document.getElementById('ro-ec-'+i).value;
+      if(ec) ros.push({no:i,ec,ph:document.getElementById('ro-ph-'+i).value,moisture:document.getElementById('ro-m-'+i).value});
+    }
+    return {...base,irrigations:irrs,runoffs:ros};
+  }
+  if(type==='check'){
+    const rv=n=>document.querySelector(`input[name="${n}"]:checked`)?.value;
+    return {...base,time:get('c-time'),deficiencies:rv('defic'),insect:rv('insect'),
+      equipment:rv('equip'),cleanliness:rv('clean'),
+      vpdNote:document.getElementById('qvpd-out').textContent,
+      note:get('c-note')};
+  }
+}
+
+async function saveRecord() {
+  const rec = collectRecord();
+  const btn = document.getElementById('main-save-btn');
+  btn.disabled=true; btn.textContent='กำลังส่ง...';
+  db[rec.type].push({...rec, ts:Date.now()});
+  try {
+    if(!cfg.url) throw new Error('ยังไม่ตั้งค่า URL');
+    await postSheets(rec);
+    showAl('al-rec','al-ok','✓ บันทึกและส่งไป Google Sheets เรียบร้อย');
+    setConn('online','เชื่อมต่อแล้ว');
+  } catch(e) {
+    queue.push({...rec, ts:Date.now()});
+    showAl('al-rec','al-info','💾 บันทึกไว้แล้ว — จะส่งเมื่อเชื่อมต่อ ('+queue.length+' รายการ)');
+    updateSyncUI();
+  }
+  btn.disabled=false; btn.textContent='💾 บันทึก & ส่งไป Google Sheets';
+  updateReport();
+}
+
+function saveLocal() {
+  const rec=collectRecord();
+  db[rec.type].push({...rec,ts:Date.now()});
+  queue.push({...rec,ts:Date.now()});
+  showAl('al-rec','al-info','📱 บันทึกในเครื่องแล้ว ('+queue.length+' รายการรอส่ง)');
+  updateReport(); updateSyncUI();
+}
+
+async function postSheets(data) {
+  const res=await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  const json=await res.json();
+  if(!json.ok) throw new Error(json.error||'Error');
+  return json;
+}
+
+// ────────────────────────────────────────
+//  PULL & FLUSH
+// ────────────────────────────────────────
+async function pullData() {
+  if(!cfg.url){alert('กรุณาตั้งค่า URL ก่อน');return}
+  const prog=document.getElementById('pull-prog');
+  const bar=document.getElementById('pull-bar');
+  const msg=document.getElementById('pull-msg');
+  prog.style.display='block'; bar.style.width='20%'; msg.textContent='กำลังเชื่อมต่อ...';
+  try {
+    let url=cfg.url+'?type=all&date='+get('pull-date');
+    const r=get('pull-room'); if(r) url+='&room='+r;
+    bar.style.width='60%'; msg.textContent='กำลังดึงข้อมูล...';
+    const res=await fetch(url);
+    const json=await res.json();
+    bar.style.width='100%';
+    if(json.ok&&json.data){
+      const d=json.data;
+      if(d.env)   db.env   = d.env.map(r=>({...r,type:'env',ts:Date.now()}));
+      if(d.plant) db.plant = d.plant.map(r=>({...r,type:'plant',ts:Date.now()}));
+      if(d.water) db.water = d.water.map(r=>({...r,type:'water',ts:Date.now()}));
+      if(d.check) db.check = d.check.map(r=>({...r,type:'check',ts:Date.now()}));
+      const tot=Object.values(d).flat().length;
+      msg.textContent=`✓ ดึงสำเร็จ ${tot} รายการ`;
+      setConn('online','เชื่อมต่อแล้ว');
+      updateReport();
+    } else throw new Error(json.error||'No data');
+  } catch(e) {
+    msg.textContent='❌ '+e.message;
+    bar.style.background='var(--red)';
+    setConn('offline','เชื่อมต่อไม่ได้');
+  }
+  setTimeout(()=>{prog.style.display='none';bar.style.background='var(--green)';bar.style.width='0%'},3500);
+}
+
+async function flushQueue() {
+  if(!cfg.url){alert('กรุณาตั้งค่า URL');return}
+  let ok=0,fail=0;
+  for(const item of [...queue]){
+    try{await postSheets(item);queue.splice(queue.indexOf(item),1);ok++;}
+    catch{fail++;}
+  }
+  alert(`ส่งสำเร็จ ${ok} รายการ${fail?' | ล้มเหลว '+fail+' รายการ':''}`);
+  updateSyncUI();
+}
+
+async function testConn() {
+  const url=get('cfg-url');
+  if(!url){showAl('al-conn','al-err','กรุณากรอก URL');return}
+  try{
+    const res=await fetch(url+'?type=summary&date='+today());
+    const json=await res.json();
+    if(json.ok) showAl('al-conn','al-ok','✓ เชื่อมต่อสำเร็จ!');
+    else throw new Error(json.error);
+    setConn('online','เชื่อมต่อแล้ว');
+  }catch(e){showAl('al-conn','al-err','❌ '+e.message);setConn('offline','เชื่อมต่อไม่ได้');}
+}
+
+// ────────────────────────────────────────
+//  REPORT
+// ────────────────────────────────────────
+function setFilter(f,btn){
+  activeFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  updateReport();
+}
+
+function updateReport(){
+  const all=[...db.env,...db.plant,...db.water,...db.check];
+  const tod=all.filter(e=>e.date===today());
+  const vs=db.env.flatMap(e=>e.areas||[]).filter(a=>a.vpd).map(a=>parseFloat(a.vpd));
+  const avgV=vs.length?(vs.reduce((a,b)=>a+b,0)/vs.length).toFixed(2):'—';
+  const hs=db.plant.flatMap(e=>e.plants||[]).filter(p=>p.height).map(p=>parseFloat(p.height));
+  const avgH=hs.length?(hs.reduce((a,b)=>a+b,0)/hs.length).toFixed(1):'—';
+  document.getElementById('rpt-metrics').innerHTML=`
+    <div class="metric"><div class="metric-label">ทั้งหมด</div><div class="metric-value">${all.length}</div></div>
+    <div class="metric"><div class="metric-label">วันนี้</div><div class="metric-value green">${tod.length}</div></div>
+    <div class="metric"><div class="metric-label">Avg VPD (kPa)</div><div class="metric-value small">${avgV}</div></div>
+    <div class="metric"><div class="metric-label">Avg Height (cm)</div><div class="metric-value small">${avgH}</div></div>`;
+  let items=[
+    ...db.env.map(e=>({...e,lbl:'🌡️ สภาวะ'})),
+    ...db.plant.map(e=>({...e,lbl:'🌱 ความสูง'})),
+    ...db.water.map(e=>({...e,lbl:'💧 น้ำ'})),
+    ...db.check.map(e=>({...e,lbl:'✅ ตรวจ'}))
+  ].sort((a,b)=>(b.ts||0)-(a.ts||0));
+  if(activeFilter!=='all') items=items.filter(e=>e.type===activeFilter);
+  const c=document.getElementById('rpt-list');
+  if(!items.length){c.innerHTML='<div class="empty">ยังไม่มีข้อมูล</div>';return}
+  c.innerHTML=items.map(e=>{
+    let det='';
+    if(e.type==='env'){
+      const evs=(e.areas||[]).filter(a=>a.vpd).map(a=>parseFloat(a.vpd));
+      const avg=evs.length?(evs.reduce((a,b)=>a+b,0)/evs.length).toFixed(2):'—';
+      det=`${e.stage} ${e.weekday||''} | Avg VPD: <strong>${avg} kPa</strong> | ${(e.areas||[]).length} จุด`;
+    }
+    if(e.type==='plant'){
+      const phs=(e.plants||[]).filter(p=>p.height).map(p=>parseFloat(p.height));
+      const avg=phs.length?(phs.reduce((a,b)=>a+b,0)/phs.length).toFixed(1):'—';
+      det=`${e.stage} | เฉลี่ย <strong>${avg} cm</strong> | ${(e.plants||[]).length} ต้น`;
+    }
+    if(e.type==='water') det=`${e.stage} | ${(e.irrigations||[]).length} รอบ | run-off ${(e.runoffs||[]).length} ต้น`;
+    if(e.type==='check') det=`${e.time||''} | พืช:${e.deficiencies} แมลง:${e.insect} อุปกรณ์:${e.equipment}${e.note?' | '+e.note:''}`;
+    const inQueue=queue.some(q=>q.ts===e.ts);
+    return `<div class="hist-item">
+      <div class="hist-top">
+        <span class="hist-date">${e.date||''}</span>
+        <span class="badge b-green">${e.lbl}</span>
+        <span class="badge b-blue">${e.room||''}</span>
+        ${inQueue?'<span class="badge b-yellow">รอส่ง</span>':''}
+      </div>
+      <div class="hist-detail">${det}</div>
+    </div>`;
+  }).join('');
+}
+
+// ────────────────────────────────────────
+//  LINE
+// ────────────────────────────────────────
+function buildLineMsg(summary){
+  const d=today();
+  let msg=`\n🌿 Grow Room Daily Report\n📅 ${d}`;
+  if(cfg.user) msg+=`\n👤 ${cfg.user}`;
+  msg+=`\n${'─'.repeat(26)}\n`;
+  if(summary){
+    msg+=`\n📊 สรุปจาก Google Sheets\n`;
+    if(summary.env?.count)   msg+=`🌡️ สภาวะ: ${summary.env.count} จุด | Avg VPD: ${summary.env.avgVPD||'—'} kPa\n`;
+    if(summary.plant?.count) msg+=`🌱 ความสูง: ${summary.plant.count} ต้น | เฉลี่ย: ${summary.plant.avgHeight||'—'} cm\n`;
+    if(summary.water?.count) msg+=`💧 น้ำ: ${summary.water.count} รายการ\n`;
+    if(summary.check?.count) msg+=`✅ ตรวจสอบ: ${summary.check.count} ครั้ง\n`;
+    msg+=`\n🔗 ดูรายละเอียดใน AppSheet`;
+  } else {
+    const incEnv=document.getElementById('ls-env').checked;
+    const incPlant=document.getElementById('ls-plant').checked;
+    const incWater=document.getElementById('ls-water').checked;
+    const incCheck=document.getElementById('ls-check').checked;
+    if(incEnv) db.env.filter(e=>e.date===d).forEach(e=>{
+      const evs=(e.areas||[]).filter(a=>a.vpd).map(a=>parseFloat(a.vpd));
+      const avg=evs.length?(evs.reduce((a,b)=>a+b,0)/evs.length).toFixed(2):'—';
+      msg+=`\n🌡️ สภาวะ | ${e.room} | ${e.stage} ${e.weekday}\n  Avg VPD: ${avg} kPa (${evs.length} จุด)\n`;
+      (e.areas||[]).forEach(a=>msg+=`  จุด${a.area}: LT${a.leafTemp}°C RH${a.rh}% VPD${a.vpd||'—'}\n`);
+    });
+    if(incPlant) db.plant.filter(e=>e.date===d).forEach(e=>{
+      const phs=(e.plants||[]).filter(p=>p.height).map(p=>parseFloat(p.height));
+      const avg=phs.length?(phs.reduce((a,b)=>a+b,0)/phs.length).toFixed(1):'—';
+      msg+=`\n🌱 ความสูง | ${e.room} | ${e.stage}\n  ${(e.plants||[]).length} ต้น | เฉลี่ย ${avg} cm\n`;
+    });
+    if(incWater) db.water.filter(e=>e.date===d).forEach(e=>{
+      msg+=`\n💧 น้ำ | ${e.room} | ${e.stage}\n`;
+      (e.irrigations||[]).forEach(ir=>msg+=`  [${ir.time}] ${ir.volume}mL EC:${ir.ec} pH:${ir.ph}\n`);
+    });
+    if(incCheck) db.check.filter(e=>e.date===d).forEach(e=>{
+      msg+=`\n✅ ตรวจ ${e.time} | ${e.room}\n  พืช:${e.deficiencies} แมลง:${e.insect} อุปกรณ์:${e.equipment}\n`;
+      if(e.note) msg+=`  หมายเหตุ: ${e.note}\n`;
+    });
+  }
+  msg+=`\n${'─'.repeat(26)}\nCANNDO PHARMA — Cultivation Dept.`;
+  return msg;
+}
+
+async function sendLine(){
+  const token=get('line-token')||cfg.lineToken;
+  if(!token){showAl('al-line','al-err','กรุณากรอก LINE Token ก่อน');return}
+  const fd=new FormData(); fd.append('message',buildLineMsg(null));
+  try{
+    const r=await fetch('https://notify-api.line.me/api/notify',{method:'POST',headers:{Authorization:'Bearer '+token},body:fd});
+    if(r.ok) showAl('al-line','al-ok','✓ ส่งรายงานไป LINE สำเร็จ');
+    else showAl('al-line','al-err','Token ไม่ถูกต้อง ตรวจสอบอีกครั้ง');
+  }catch{showAl('al-line','al-err','เชื่อมต่อไม่ได้');}
+}
+
+async function sendLineSummary(){
+  const token=get('line-token')||cfg.lineToken;
+  if(!token){showAl('al-line','al-err','กรุณากรอก LINE Token');return}
+  if(!cfg.url){showAl('al-line','al-err','กรุณาตั้งค่า Sheets URL ก่อน');return}
+  try{
+    const res=await fetch(cfg.url+'?type=summary&date='+today());
+    const json=await res.json();
+    if(!json.ok) throw new Error(json.error);
+    const fd=new FormData(); fd.append('message',buildLineMsg(json.data.summary));
+    const r=await fetch('https://notify-api.line.me/api/notify',{method:'POST',headers:{Authorization:'Bearer '+token},body:fd});
+    if(r.ok) showAl('al-line','al-ok','✓ ส่งสรุปจาก Google Sheets ไป LINE สำเร็จ');
+    else showAl('al-line','al-err','Token ไม่ถูกต้อง');
+  }catch(e){showAl('al-line','al-err','เกิดข้อผิดพลาด: '+e.message);}
+}
+
+async function testLine(){
+  const token=get('line-token')||cfg.lineToken;
+  if(!token){showAl('al-line','al-err','กรุณากรอก Token');return}
+  const fd=new FormData();
+  fd.append('message','\n🌿 CANNDO PHARMA\nGrow Room Logger — ทดสอบการเชื่อมต่อ LINE ✓');
+  try{
+    const r=await fetch('https://notify-api.line.me/api/notify',{method:'POST',headers:{Authorization:'Bearer '+token},body:fd});
+    if(r.ok) showAl('al-line','al-ok','✓ ทดสอบสำเร็จ! ตรวจสอบ LINE ของคุณ');
+    else showAl('al-line','al-err','Token ไม่ถูกต้อง');
+  }catch{showAl('al-line','al-err','เชื่อมต่อไม่ได้');}
+}
+
+// ────────────────────────────────────────
+//  CONFIG
+// ────────────────────────────────────────
+function saveCfg(){
+  cfg.url       = get('cfg-url');
+  cfg.user      = get('cfg-user');
+  cfg.room      = get('cfg-room') || 'R-01';
+  cfg.lineToken = get('line-token');
+  document.getElementById('tb-room').textContent = cfg.room + (cfg.user?' — '+cfg.user:'');
+  set('r-room', cfg.room);
+  updateSyncUI();
+}
+
+function loadCfg(){
+  set('cfg-url',   cfg.url);
+  set('cfg-user',  cfg.user);
+  set('cfg-room',  cfg.room);
+  set('line-token',cfg.lineToken);
+  document.getElementById('tb-room').textContent = cfg.room;
+}
+
+function updateSyncUI(){
+  document.getElementById('sy-sheets').textContent  = cfg.url?'ตั้งค่าแล้ว ✓':'ยังไม่ตั้งค่า';
+  document.getElementById('sy-line').textContent    = cfg.lineToken?'ตั้งค่าแล้ว ✓':'ยังไม่ตั้งค่า';
+  document.getElementById('sy-queue').textContent   = queue.length + ' รายการ';
+  const ql=document.getElementById('queue-list');
+  const fb=document.getElementById('flush-btn');
+  if(!queue.length){ql.innerHTML='<div class="empty">ไม่มีข้อมูลค้างส่ง ✓</div>';fb.style.display='none';}
+  else{
+    ql.innerHTML=queue.map(q=>`<div class="sync-row"><span>${q.type} — ${q.date}</span><span class="badge b-yellow">รอส่ง</span></div>`).join('');
+    fb.style.display='block';
+  }
+}
+
+function clearAll(){
+  if(!confirm('ลบข้อมูลทั้งหมดในเครื่อง?')) return;
+  db.env.length=0;db.plant.length=0;db.water.length=0;db.check.length=0;queue.length=0;
+  updateReport();updateSyncUI();
+  alert('ลบเรียบร้อย');
+}
+
+init();
+</script>
+</body>
+</html>
